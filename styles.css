@@ -17,6 +17,11 @@ body {
 body {
   margin: 0;
   padding: 0;
+  /* The whole page is a strumming surface: a held drag across the title must
+     strike chimes, not select text (and then drag the selection, which
+     swallows the pointer events mid-strum). */
+  -webkit-user-select: none;
+  user-select: none;
   font-family: Georgia, "Times New Roman", Times, serif;
   line-height: 1.6;
   color: var(--ink);

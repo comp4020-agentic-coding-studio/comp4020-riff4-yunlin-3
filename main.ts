@@ -358,9 +358,15 @@ function setupChimes(): void {
   // resting palm, a two-finger player) must not corrupt a different finger's
   // still-active strum, and pointercancel (a notification swipe, an incoming
   // call) must end only its own drag.
+  //
+  // Listeners live on the document, not the grove: with the backdrop filling
+  // the page, a strum naturally BEGINS on the background and sweeps into the
+  // chimes — a grove-scoped pointerdown never sees that press, so the whole
+  // swipe is silent. The geometry already confines actual strikes to the
+  // tubes, so document-wide tracking costs nothing in precision.
   const pointers = new Map<number, { x: number; y: number; t: number }>();
 
-  grove.addEventListener("pointerdown", (event) => {
+  document.addEventListener("pointerdown", (event) => {
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY, t: performance.now() });
     // Geometric test first (it knows where a swinging tube currently is), but
     // fall back to the event's own target: a press that lands on the button
@@ -374,10 +380,9 @@ function setupChimes(): void {
   const endPointer = (event: PointerEvent): void => {
     pointers.delete(event.pointerId);
   };
-  grove.addEventListener("pointerup", endPointer);
-  grove.addEventListener("pointerleave", endPointer);
-  grove.addEventListener("pointercancel", endPointer);
-  grove.addEventListener("pointermove", (event) => {
+  document.addEventListener("pointerup", endPointer);
+  document.addEventListener("pointercancel", endPointer);
+  document.addEventListener("pointermove", (event) => {
     const prev = pointers.get(event.pointerId);
     if (!prev) return;
     const nowMs = performance.now();
