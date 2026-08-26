@@ -183,7 +183,13 @@ function setupChimes(): void {
   function render(): void {
     if (reducedMotion) return;
     for (const t of tubes) {
-      t.el.style.transform = t.angle === 0 ? "" : `rotate(${((t.angle * 180) / Math.PI).toFixed(3)}deg)`;
+      // Physics convention: positive angle = tip displaced to +x (right).
+      // CSS rotate(+θ) is clockwise, which moves a BELOW-pivot tip to the
+      // LEFT — so the rendered rotation is the negated angle. Everything else
+      // (hit tests, collisions) uses the physics convention; only this line
+      // converts, so the visible tube and the simulated tube are one and the
+      // same to the pointer.
+      t.el.style.transform = t.angle === 0 ? "" : `rotate(${((-t.angle * 180) / Math.PI).toFixed(3)}deg)`;
     }
   }
 
@@ -356,7 +362,13 @@ function setupChimes(): void {
 
   grove.addEventListener("pointerdown", (event) => {
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY, t: performance.now() });
-    const t = tubeAtPoint(event.clientX, event.clientY);
+    // Geometric test first (it knows where a swinging tube currently is), but
+    // fall back to the event's own target: a press that lands on the button
+    // element must always strike, whatever rounding says.
+    const t =
+      tubeAtPoint(event.clientX, event.clientY) ??
+      tubes.find((tube) => tube.el === event.target) ??
+      null;
     if (t) hitTube(t, event.clientX, event.clientY, 0);
   });
   const endPointer = (event: PointerEvent): void => {
