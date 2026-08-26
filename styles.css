@@ -26,6 +26,120 @@ body {
   min-height: 100vh;
 }
 
+/* --- Jungle backdrop ------------------------------------------------------
+   Fixed behind everything, never interactive. Soft green washes pool in the
+   corners; bamboo stalks stand in the lower corners with slowly swaying leaf
+   clusters, a sprig hangs top right, and a few loose leaves drift down. */
+
+.jungle {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 0% 100%, rgba(134, 152, 106, 0.16), transparent 70%),
+    radial-gradient(55% 45% at 100% 100%, rgba(134, 152, 106, 0.13), transparent 70%),
+    radial-gradient(45% 40% at 100% 0%, rgba(163, 177, 132, 0.12), transparent 70%);
+}
+
+header,
+main {
+  position: relative;
+  z-index: 1;
+}
+
+.jungle svg {
+  position: absolute;
+}
+
+.jungle use {
+  fill: #7f915f;
+}
+
+.jungle use.lite,
+.jungle .lite use {
+  fill: #9dab7d;
+}
+
+.jungle .branch,
+.jungle .vine {
+  fill: none;
+  stroke: #7f915f;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.stalk-left {
+  left: max(-2vw, -24px);
+  bottom: -3vh;
+  width: clamp(130px, 19vw, 280px);
+  opacity: 0.5;
+}
+
+.stalk-right {
+  right: max(-2vw, -20px);
+  bottom: -5vh;
+  width: clamp(90px, 12vw, 180px);
+  opacity: 0.4;
+  transform: scaleX(-1);
+}
+
+.sprig {
+  top: 0;
+  right: 4vw;
+  width: clamp(100px, 13vw, 200px);
+  opacity: 0.45;
+}
+
+/* CSS transform on a group REPLACES its transform attribute, so every swaying
+   cluster is an inner <g class="sway"> wrapped by an outer <g translate(...)>
+   that carries the position. */
+.sway {
+  transform-box: fill-box;
+  transform-origin: left bottom;
+  animation: sway 6.5s ease-in-out var(--sd, 0s) infinite alternate;
+}
+
+.sway-down {
+  transform-origin: left top;
+}
+
+@keyframes sway {
+  from {
+    transform: rotate(-2.4deg);
+  }
+  to {
+    transform: rotate(3deg);
+  }
+}
+
+.drift {
+  top: -8vh;
+  opacity: 0;
+  animation: drift var(--t, 24s) linear var(--d, 0s) infinite;
+}
+
+@keyframes drift {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 0;
+  }
+  6% {
+    opacity: var(--o, 0.4);
+  }
+  55% {
+    transform: translate3d(var(--dx, 5vw), 62vh, 0) rotate(150deg);
+  }
+  94% {
+    opacity: var(--o, 0.4);
+  }
+  100% {
+    transform: translate3d(calc(var(--dx, 5vw) * 0.3), 120vh, 0) rotate(310deg);
+    opacity: 0;
+  }
+}
+
 header {
   padding: 1rem 1.5rem 0;
 }
@@ -178,5 +292,14 @@ h1 {
   /* main.ts also checks this and skips the swing simulation's transforms. */
   .chime {
     transition: none;
+  }
+
+  .sway {
+    animation: none;
+  }
+
+  /* A leaf frozen mid-air reads as a glitch, not a decoration. */
+  .drift {
+    display: none;
   }
 }

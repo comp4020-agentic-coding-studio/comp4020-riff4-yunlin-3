@@ -22,6 +22,89 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <!--
+      Decorative jungle backdrop: inline SVG bamboo and leaves animated in CSS.
+      Purely visual, so aria-hidden and pointer-events: none; the instrument
+      stays the only interactive surface. All svgs share the #leaf path defined
+      in the first one (same-document references resolve across inline svgs).
+    -->
+    <div class="jungle" aria-hidden="true">
+      <svg class="stalk-left" viewBox="0 0 260 640">
+        <defs>
+          <path id="leaf" d="M0 0 C 26 -13, 58 -12, 84 0 C 58 11, 24 12, 0 0 Z" />
+        </defs>
+        <g fill="#86986a">
+          <rect x="36" y="60" width="20" height="114" rx="9" />
+          <rect x="36" y="180" width="20" height="114" rx="9" />
+          <rect x="36" y="300" width="20" height="114" rx="9" />
+          <rect x="36" y="420" width="20" height="114" rx="9" />
+          <rect x="36" y="540" width="20" height="100" rx="9" />
+        </g>
+        <g fill="#a3b184">
+          <rect x="96" y="120" width="13" height="98" rx="6" />
+          <rect x="96" y="224" width="13" height="120" rx="6" />
+          <rect x="96" y="350" width="13" height="98" rx="6" />
+          <rect x="96" y="454" width="13" height="94" rx="6" />
+          <rect x="96" y="554" width="13" height="86" rx="6" />
+        </g>
+        <g transform="translate(56 170)"><g class="sway">
+          <path class="branch" d="M0 0 Q 26 -8 44 -22" />
+          <use href="#leaf" transform="translate(42 -24) rotate(-28) scale(0.9)" />
+          <use href="#leaf" class="lite" transform="translate(36 -15) rotate(8)" />
+          <use href="#leaf" transform="translate(28 -8) rotate(40) scale(0.75)" />
+        </g></g>
+        <g transform="translate(109 240)"><g class="sway" style="--sd: -2.2s">
+          <path class="branch" d="M0 0 Q 24 -4 40 -16" />
+          <use href="#leaf" class="lite" transform="translate(38 -18) rotate(-20) scale(0.8)" />
+          <use href="#leaf" transform="translate(30 -10) rotate(22) scale(0.7)" />
+        </g></g>
+        <g transform="translate(56 350)"><g class="sway" style="--sd: -4.1s">
+          <path class="branch" d="M0 0 Q 26 2 46 -8" />
+          <use href="#leaf" transform="translate(44 -10) rotate(-12)" />
+          <use href="#leaf" class="lite" transform="translate(34 -4) rotate(30) scale(0.8)" />
+          <use href="#leaf" transform="translate(24 0) rotate(58) scale(0.6)" />
+        </g></g>
+      </svg>
+
+      <svg class="stalk-right" viewBox="0 0 160 560">
+        <g fill="#8b9c70">
+          <rect x="42" y="40" width="17" height="104" rx="8" />
+          <rect x="42" y="150" width="17" height="118" rx="8" />
+          <rect x="42" y="274" width="17" height="104" rx="8" />
+          <rect x="42" y="384" width="17" height="90" rx="8" />
+          <rect x="42" y="480" width="17" height="80" rx="8" />
+        </g>
+        <g transform="translate(60 140)"><g class="sway" style="--sd: -1.4s">
+          <path class="branch" d="M0 0 Q 24 -6 42 -20" />
+          <use href="#leaf" transform="translate(40 -22) rotate(-24) scale(0.85)" />
+          <use href="#leaf" class="lite" transform="translate(32 -12) rotate(16) scale(0.75)" />
+        </g></g>
+        <g transform="translate(60 320)"><g class="sway" style="--sd: -5.3s">
+          <path class="branch" d="M0 0 Q 24 0 42 -10" />
+          <use href="#leaf" class="lite" transform="translate(40 -12) rotate(-10) scale(0.8)" />
+          <use href="#leaf" transform="translate(30 -4) rotate(34) scale(0.65)" />
+        </g></g>
+      </svg>
+
+      <svg class="sprig" viewBox="0 0 220 210">
+        <path class="vine" d="M150 0 Q 138 60 108 92" />
+        <g transform="translate(108 92)"><g class="sway sway-down" style="--sd: -1.3s">
+          <use href="#leaf" transform="rotate(118) scale(0.9)" />
+          <use href="#leaf" class="lite" transform="rotate(152) scale(0.8)" />
+          <use href="#leaf" transform="rotate(185) scale(0.7)" />
+        </g></g>
+        <g transform="translate(176 40)"><g class="sway sway-down" style="--sd: -3.6s">
+          <use href="#leaf" class="lite" transform="rotate(130) scale(0.7)" />
+          <use href="#leaf" transform="rotate(168) scale(0.6)" />
+        </g></g>
+      </svg>
+
+      <svg class="drift" style="left: 6%; width: 38px; --t: 24s; --d: -6s; --dx: 6vw; --o: 0.4" viewBox="0 0 84 26"><use href="#leaf" transform="translate(0 13)" /></svg>
+      <svg class="drift lite" style="left: 24%; width: 30px; --t: 30s; --d: -17s; --dx: -4vw; --o: 0.35" viewBox="0 0 84 26"><use href="#leaf" transform="translate(0 13)" /></svg>
+      <svg class="drift" style="left: 47%; width: 26px; --t: 27s; --d: -11s; --dx: 5vw; --o: 0.3" viewBox="0 0 84 26"><use href="#leaf" transform="translate(0 13)" /></svg>
+      <svg class="drift lite" style="left: 66%; width: 42px; --t: 22s; --d: -3s; --dx: -6vw; --o: 0.38" viewBox="0 0 84 26"><use href="#leaf" transform="translate(0 13)" /></svg>
+      <svg class="drift" style="left: 86%; width: 32px; --t: 33s; --d: -24s; --dx: 4vw; --o: 0.32" viewBox="0 0 84 26"><use href="#leaf" transform="translate(0 13)" /></svg>
+    </div>
     <header>
       <nav aria-label="Primary">
         <a href="./">Bamboo chimes</a>
