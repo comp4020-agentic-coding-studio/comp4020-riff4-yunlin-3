@@ -132,13 +132,11 @@ h1 {
       #a97f42 86%,
       #6f4d22 100%
     );
-  /* Pivot above the tube, at the beam: the tube swings on its string. */
+  /* Pivot above the tube, at the beam: the tube swings on its string. The
+     swing itself is simulated in main.ts, which sets rotate() every frame ---
+     no transform transition here, it would fight the simulation. */
   transform-origin: 50% -0.85rem;
-  transform: rotate(0deg);
-  transition:
-    transform 0.5s ease-out,
-    box-shadow 0.4s ease-out,
-    filter 0.3s ease-out;
+  transition: filter 0.3s ease-out;
   box-shadow: 0 2px 4px rgba(42, 40, 37, 0.2);
 }
 
@@ -176,37 +174,9 @@ h1 {
   outline-offset: 4px;
 }
 
-.chime.struck {
-  animation: swing 1.6s ease-out;
-  box-shadow:
-    0 2px 4px rgba(42, 40, 37, 0.2),
-    inset 0 -2rem 1.5rem -1rem rgba(168, 52, 31, 0.35);
-}
-
-@keyframes swing {
-  0% {
-    transform: rotate(0deg);
-  }
-  15% {
-    transform: rotate(var(--swing-angle, 6deg));
-  }
-  40% {
-    transform: rotate(calc(var(--swing-angle, 6deg) * -0.55));
-  }
-  65% {
-    transform: rotate(calc(var(--swing-angle, 6deg) * 0.25));
-  }
-  100% {
-    transform: rotate(0deg);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
+  /* main.ts also checks this and skips the swing simulation's transforms. */
   .chime {
     transition: none;
-  }
-
-  .chime.struck {
-    animation: none;
   }
 }

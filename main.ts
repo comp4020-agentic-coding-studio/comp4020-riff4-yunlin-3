@@ -10,6 +10,10 @@ let dryGain: GainNode | null = null;
 let wetGain: GainNode | null = null;
 let reverb: ConvolverNode | null = null;
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
 function createReverbImpulse(ctx: AudioContext, seconds: number, decay: number): AudioBuffer {
   const length = Math.floor(ctx.sampleRate * seconds);
   const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
@@ -49,10 +53,11 @@ function ensureAudio(): AudioContext {
   return ctx;
 }
 
-function strike(noteIndex: number, pan: number): void {
+function strike(noteIndex: number, pan: number, intensity = 1): void {
   const ctx = ensureAudio();
   const freq = NOTE_FREQS[noteIndex];
   const now = ctx.currentTime;
+  const level = clamp(intensity, 0.1, 1.2);
 
   // Bamboo rings woodier and shorter than metal: a dry knock from the striker,
   // a breathy air-column resonance sitting on the tube's pitch, and a few
@@ -62,7 +67,7 @@ function strike(noteIndex: number, pan: number): void {
   const decay = 0.9 + Math.random() * 0.5;
 
   const panner = ctx.createStereoPanner();
-  panner.pan.value = Math.max(-1, Math.min(1, pan));
+  panner.pan.value = clamp(pan, -1, 1);
   panner.connect(dryGain!);
   panner.connect(reverb!);
 
@@ -81,7 +86,7 @@ function strike(noteIndex: number, pan: number): void {
     osc.detune.value = detune;
     const env = ctx.createGain();
     env.gain.setValueAtTime(0, now);
-    env.gain.linearRampToValueAtTime(gain, now + 0.003);
+    env.gain.linearRampToValueAtTime(gain * level, now + 0.003);
     env.gain.exponentialRampToValueAtTime(0.0004, now + decay * decayScale);
     osc.connect(env);
     env.connect(panner);
@@ -101,7 +106,7 @@ function strike(noteIndex: number, pan: number): void {
   knockFilter.frequency.value = 1400 + freq;
   knockFilter.Q.value = 1.1;
   const knockEnv = ctx.createGain();
-  knockEnv.gain.setValueAtTime(0.5, now);
+  knockEnv.gain.setValueAtTime(0.5 * level, now);
   knockEnv.gain.exponentialRampToValueAtTime(0.0004, now + 0.045);
   knock.connect(knockFilter);
   knockFilter.connect(knockEnv);
@@ -117,7 +122,7 @@ function strike(noteIndex: number, pan: number): void {
   breathFilter.frequency.value = freq;
   breathFilter.Q.value = 18;
   const breathEnv = ctx.createGain();
-  breathEnv.gain.setValueAtTime(0.3, now);
+  breathEnv.gain.setValueAtTime(0.3 * level, now);
   breathEnv.gain.exponentialRampToValueAtTime(0.0004, now + 0.28);
   breath.connect(breathFilter);
   breathFilter.connect(breathEnv);
@@ -128,94 +133,247 @@ function strike(noteIndex: number, pan: number): void {
 function setupChimes(): void {
   const grove = document.querySelector<HTMLElement>("#grove");
   if (!grove) return;
-  const chimes = Array.from(grove.querySelectorAll<HTMLButtonElement>(".chime"));
-  const struckRecently = new Set<HTMLButtonElement>();
-  // Keyed per chime, not a shared counter: each re-strike's cleanup timeout
-  // checks this before clearing "struck", so a fast roll on one tube (well
-  // outside the 90ms debounce, well inside the 1.6s animation) doesn't let an
-  // earlier strike's stale timer cut the later strike's swing short.
-  const strikeToken = new Map<HTMLButtonElement, number>();
+  const chimeEls = Array.from(grove.querySelectorAll<HTMLButtonElement>(".chime"));
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  function playChime(chime: HTMLButtonElement): void {
-    const noteIndex = Number(chime.dataset.note ?? "0");
-    const rect = chime.getBoundingClientRect();
+  // Each tube is a damped pendulum pivoting where its cord meets the beam.
+  // Angle is radians (positive leans right), velocity rad/s; geometry is
+  // viewport pixels, measured at rest and remeasured on resize/scroll — both
+  // rects and pointer events use client coordinates, so they stay comparable.
+  interface Tube {
+    el: HTMLButtonElement;
+    note: number;
+    pan: number;
+    pivotX: number;
+    pivotY: number;
+    halfWidth: number;
+    length: number;
+    angle: number;
+    vel: number;
+  }
+
+  const tubes: Tube[] = chimeEls.map((el) => ({
+    el,
+    note: Number(el.dataset.note ?? "0"),
+    pan: 0,
+    pivotX: 0,
+    pivotY: 0,
+    halfWidth: 0,
+    length: 0,
+    angle: 0,
+    vel: 0,
+  }));
+
+  function measure(): void {
+    // The cord is 0.85rem (matches .chime::before / transform-origin in CSS).
+    const stringPx = 0.85 * parseFloat(getComputedStyle(document.documentElement).fontSize);
     const groveRect = grove!.getBoundingClientRect();
-    const center = rect.left + rect.width / 2 - groveRect.left;
-    const pan = (center / groveRect.width) * 2 - 1;
-
-    strike(noteIndex, pan);
-
-    if (struckRecently.has(chime)) {
-      chime.classList.remove("struck");
-      // Force a reflow so the animation restarts on rapid re-strikes.
-      void chime.offsetWidth;
+    for (const t of tubes) {
+      t.el.style.transform = "";
+      const rect = t.el.getBoundingClientRect();
+      t.pivotX = rect.left + rect.width / 2;
+      t.pivotY = rect.top - stringPx;
+      t.halfWidth = rect.width / 2;
+      t.length = rect.bottom - t.pivotY;
+      t.pan = ((t.pivotX - groveRect.left) / groveRect.width) * 2 - 1;
     }
-    chime.style.setProperty("--swing-angle", `${(Math.random() - 0.5) * 12 + (pan > 0 ? 5 : -5)}deg`);
-    chime.classList.add("struck");
-    struckRecently.add(chime);
-    const token = (strikeToken.get(chime) ?? 0) + 1;
-    strikeToken.set(chime, token);
-    setTimeout(() => {
-      if (strikeToken.get(chime) !== token) return;
-      chime.classList.remove("struck");
-      struckRecently.delete(chime);
-    }, 1600);
+    render();
   }
 
-  const activePointers = new Set<number>();
-  const lastStruck = new Map<HTMLButtonElement, number>();
+  function render(): void {
+    if (reducedMotion) return;
+    for (const t of tubes) {
+      t.el.style.transform = t.angle === 0 ? "" : `rotate(${((t.angle * 180) / Math.PI).toFixed(3)}deg)`;
+    }
+  }
 
-  function maybeStrike(target: EventTarget | null): void {
-    if (!(target instanceof HTMLButtonElement) || !target.classList.contains("chime")) return;
-    const last = lastStruck.get(target) ?? 0;
+  // --- Pendulum integration -------------------------------------------------
+
+  const GRAVITY = 3000; // px/s² — tuned for feel, not for Earth
+  const DAMPING = 0.7; // 1/s
+  const MAX_ANGLE = 0.5; // rad — the cord goes taut against the beam
+
+  let rafId = 0;
+  let lastFrame = 0;
+
+  function frame(now: number): void {
+    const dt = Math.min(0.02, (now - lastFrame) / 1000);
+    lastFrame = now;
+    let moving = false;
+    for (const t of tubes) {
+      t.vel += -(GRAVITY / t.length) * Math.sin(t.angle) * dt;
+      t.vel *= Math.exp(-DAMPING * dt);
+      t.angle += t.vel * dt;
+      if (Math.abs(t.angle) > MAX_ANGLE) {
+        t.angle = Math.sign(t.angle) * MAX_ANGLE;
+        if (Math.sign(t.vel) === Math.sign(t.angle)) t.vel *= -0.35;
+      }
+      if (Math.abs(t.angle) < 0.003 && Math.abs(t.vel) < 0.02) {
+        t.angle = 0;
+        t.vel = 0;
+      } else {
+        moving = true;
+      }
+    }
+    collide(now);
+    render();
+    if (moving) {
+      rafId = requestAnimationFrame(frame);
+    } else {
+      rafId = 0;
+    }
+  }
+
+  function wake(): void {
+    if (rafId) return;
+    lastFrame = performance.now();
+    rafId = requestAnimationFrame(frame);
+  }
+
+  // --- Tube-on-tube collisions ---------------------------------------------
+
+  // Tube tops hang level, so a swinging pair first touches at the bottom of
+  // the shorter tube. Equal-mass collision with restitution, plus positional
+  // separation so they don't sink into each other; a hard enough clack rings
+  // both tubes, scaled by how fast they met.
+  const RESTITUTION = 0.8;
+  const lastClack = new Map<number, number>();
+
+  function collide(nowMs: number): void {
+    // Iterated sequential solver: separating one pair can shove the shared
+    // tube into its other neighbour, so a single pass over the pairs can end
+    // the frame with tubes still drawn overlapping. Repeat until no pair
+    // penetrates (a few passes always suffice for a seven-tube chain).
+    for (let pass = 0; pass < 6; pass++) {
+      let anyOverlap = false;
+      for (let i = 0; i < tubes.length - 1; i++) {
+        const a = tubes[i];
+        const b = tubes[i + 1];
+        const h = Math.min(a.length, b.length);
+        const edgeA = a.pivotX + Math.sin(a.angle) * h + a.halfWidth;
+        const edgeB = b.pivotX + Math.sin(b.angle) * h - b.halfWidth;
+        const overlap = edgeA - edgeB;
+        if (overlap <= 0) continue;
+        anyOverlap = true;
+
+        const push = (overlap / 2 + 0.5) / h;
+        a.angle -= push;
+        b.angle += push;
+
+        const uA = a.vel * h;
+        const uB = b.vel * h;
+        const closing = uA - uB;
+        if (closing <= 0) continue;
+        a.vel = ((1 - RESTITUTION) * uA + (1 + RESTITUTION) * uB) / 2 / h;
+        b.vel = ((1 + RESTITUTION) * uA + (1 - RESTITUTION) * uB) / 2 / h;
+
+        const last = lastClack.get(i) ?? 0;
+        if (closing > 90 && nowMs - last > 80) {
+          lastClack.set(i, nowMs);
+          const punch = 0.25 + Math.min(1, closing / 1500) * 0.6;
+          strike(a.note, a.pan, punch);
+          strike(b.note, b.pan, punch);
+        }
+      }
+      if (!anyOverlap) break;
+    }
+  }
+
+  // --- Striking -------------------------------------------------------------
+
+  const lastStruck = new Map<Tube, number>();
+
+  function hitTube(t: Tube, x: number, y: number, vx: number): void {
     const nowMs = performance.now();
-    if (nowMs - last < 90) return;
-    lastStruck.set(target, nowMs);
-    playChime(target);
+    if (nowMs - (lastStruck.get(t) ?? 0) < 60) return;
+    lastStruck.set(t, nowMs);
+
+    strike(t.note, t.pan, 0.45 + Math.abs(vx) / 2600);
+
+    // The pointer's horizontal velocity becomes angular velocity at the
+    // contact height, so the tube swings the way it was hit, harder for a
+    // faster strum. A near-still tap just pushes the tube away from the side
+    // it was touched on.
+    const arm = clamp(y - t.pivotY, 60, t.length);
+    let impulse = vx / arm;
+    if (Math.abs(impulse) < 0.6) {
+      const side = x <= t.pivotX + Math.sin(t.angle) * arm ? 1 : -1;
+      impulse = side * (0.8 + Math.random() * 0.5);
+    }
+    t.vel = clamp(t.vel + impulse, -4.5, 4.5);
+    wake();
   }
 
-  // Touch pointers get implicit capture on pointerdown: the browser pins
-  // event.target to whichever tube the finger first touched, so a dragging
-  // finger's later pointermoves keep reporting that same original tube even
-  // as it slides over its neighbours. elementFromPoint reads the real
-  // element under the pointer's current coordinates regardless of capture,
-  // which is what drag-strum needs; mouse pointers aren't captured, so this
-  // is a no-op improvement for them.
-  function chimeAt(event: PointerEvent): Element | null {
-    return document.elementFromPoint(event.clientX, event.clientY);
+  function tubeAtPoint(x: number, y: number): Tube | null {
+    for (const t of tubes) {
+      if (y < t.pivotY || y > t.pivotY + t.length) continue;
+      const cx = t.pivotX + Math.sin(t.angle) * (y - t.pivotY);
+      if (Math.abs(x - cx) <= t.halfWidth) return t;
+    }
+    return null;
   }
 
-  // Tracked per pointerId, not one shared boolean: a stray second contact
-  // (a resting palm, a two-finger player) firing its own pointerup must not
-  // end a different finger's still-active drag-strum.
+  // A fast strum moves many pixels between pointermove events, so testing only
+  // the event's own position skips whole tubes. Sweep the segment from the
+  // previous position instead: any tube whose centreline the segment crosses
+  // (or whose body the endpoint lands in) gets struck.
+  function sweep(x0: number, y0: number, x1: number, y1: number, vx: number): void {
+    for (const t of tubes) {
+      const cx = t.pivotX + Math.sin(t.angle) * t.length * 0.75;
+      const f0 = x0 - cx;
+      const f1 = x1 - cx;
+      let hitY = -1;
+      if (f0 < 0 !== f1 < 0) {
+        const s = f0 / (f0 - f1);
+        hitY = y0 + (y1 - y0) * s;
+      } else if (Math.abs(f1) <= t.halfWidth) {
+        hitY = y1;
+      }
+      if (hitY >= t.pivotY && hitY <= t.pivotY + t.length) {
+        hitTube(t, x0, hitY, vx);
+      }
+    }
+  }
+
+  // Tracked per pointerId, not one shared record: a stray second contact (a
+  // resting palm, a two-finger player) must not corrupt a different finger's
+  // still-active strum, and pointercancel (a notification swipe, an incoming
+  // call) must end only its own drag.
+  const pointers = new Map<number, { x: number; y: number; t: number }>();
+
   grove.addEventListener("pointerdown", (event) => {
-    activePointers.add(event.pointerId);
-    maybeStrike(chimeAt(event));
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY, t: performance.now() });
+    const t = tubeAtPoint(event.clientX, event.clientY);
+    if (t) hitTube(t, event.clientX, event.clientY, 0);
   });
-  grove.addEventListener("pointerup", (event) => {
-    activePointers.delete(event.pointerId);
-  });
-  grove.addEventListener("pointerleave", (event) => {
-    activePointers.delete(event.pointerId);
-  });
-  // A touch can be interrupted by the system (a notification swipe, an
-  // incoming call, palm rejection) without ever firing "pointerup" --- without
-  // this, the next bare pointermove over an untouched tube reads as a drag
-  // still in progress and phantom-strikes it.
-  grove.addEventListener("pointercancel", (event) => {
-    activePointers.delete(event.pointerId);
-  });
+  const endPointer = (event: PointerEvent): void => {
+    pointers.delete(event.pointerId);
+  };
+  grove.addEventListener("pointerup", endPointer);
+  grove.addEventListener("pointerleave", endPointer);
+  grove.addEventListener("pointercancel", endPointer);
   grove.addEventListener("pointermove", (event) => {
-    if (activePointers.has(event.pointerId)) maybeStrike(chimeAt(event));
+    const prev = pointers.get(event.pointerId);
+    if (!prev) return;
+    const nowMs = performance.now();
+    const vx = (event.clientX - prev.x) / (Math.max(4, nowMs - prev.t) / 1000);
+    sweep(prev.x, prev.y, event.clientX, event.clientY, vx);
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY, t: nowMs });
   });
 
-  // Keyboard activation (Enter/Space) dispatches "click" with no preceding
-  // "pointerdown", so this still needs its own listener --- but it must go
-  // through the same debounced path as pointerdown, or a mouse/touch tap
-  // (which fires both pointerdown and click) double-strikes the chime.
-  for (const chime of chimes) {
-    chime.addEventListener("click", () => maybeStrike(chime));
+  // Keyboard activation (Enter/Space) dispatches "click" with detail 0; pointer
+  // clicks carry detail >= 1 and were already handled at pointerdown, so
+  // filtering on detail avoids the tap double-strike.
+  for (const t of tubes) {
+    t.el.addEventListener("click", (event) => {
+      if (event.detail !== 0) return;
+      hitTube(t, t.pivotX, t.pivotY + t.length * 0.7, 0);
+    });
   }
+
+  window.addEventListener("resize", measure);
+  window.addEventListener("scroll", measure, { passive: true });
+  measure();
 }
 
 setupChimes();
