@@ -35,13 +35,15 @@
       </p>
       <div class="grove" id="grove" aria-label="Seven bamboo chimes, tuned to a five-tone scale" role="group">
         <div class="beam" aria-hidden="true"></div>
-        <button class="chime" type="button" data-note="0" style="--h: 88%" aria-label="Chime 1 of 7, lowest tone"></button>
-        <button class="chime" type="button" data-note="1" style="--h: 96%" aria-label="Chime 2 of 7"></button>
-        <button class="chime" type="button" data-note="2" style="--h: 78%" aria-label="Chime 3 of 7"></button>
-        <button class="chime" type="button" data-note="3" style="--h: 100%" aria-label="Chime 4 of 7, middle tone"></button>
-        <button class="chime" type="button" data-note="4" style="--h: 72%" aria-label="Chime 5 of 7"></button>
-        <button class="chime" type="button" data-note="5" style="--h: 90%" aria-label="Chime 6 of 7"></button>
-        <button class="chime" type="button" data-note="6" style="--h: 66%" aria-label="Chime 7 of 7, highest tone"></button>
+        <!-- Tube length follows pitch (length ∝ 1/√frequency): lowest note on
+             the left is the longest tube, stepping down to the highest. -->
+        <button class="chime" type="button" data-note="0" style="--h: 100%" aria-label="Chime 1 of 7, lowest tone"></button>
+        <button class="chime" type="button" data-note="1" style="--h: 94%" aria-label="Chime 2 of 7"></button>
+        <button class="chime" type="button" data-note="2" style="--h: 87%" aria-label="Chime 3 of 7"></button>
+        <button class="chime" type="button" data-note="3" style="--h: 82%" aria-label="Chime 4 of 7, middle tone"></button>
+        <button class="chime" type="button" data-note="4" style="--h: 75%" aria-label="Chime 5 of 7"></button>
+        <button class="chime" type="button" data-note="5" style="--h: 71%" aria-label="Chime 6 of 7"></button>
+        <button class="chime" type="button" data-note="6" style="--h: 65%" aria-label="Chime 7 of 7, highest tone"></button>
       </div>
     </main>
     <script type="module" src="./main.ts"></script>
