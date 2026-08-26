@@ -205,8 +205,11 @@ function setupChimes(): void {
       t.vel *= Math.exp(-DAMPING * dt);
       t.angle += t.vel * dt;
       if (Math.abs(t.angle) > MAX_ANGLE) {
+        // The cord goes taut: the jerk swallows the energy rather than
+        // bouncing the tube back — it stalls at the limit and gravity brings
+        // it home, instead of whipping against the direction it was thrown.
         t.angle = Math.sign(t.angle) * MAX_ANGLE;
-        if (Math.sign(t.vel) === Math.sign(t.angle)) t.vel *= -0.35;
+        if (Math.sign(t.vel) === Math.sign(t.angle)) t.vel *= -0.05;
       }
       if (Math.abs(t.angle) < 0.003 && Math.abs(t.vel) < 0.02) {
         t.angle = 0;
@@ -235,8 +238,10 @@ function setupChimes(): void {
   // Tube tops hang level, so a swinging pair first touches at the bottom of
   // the shorter tube. Equal-mass collision with restitution, plus positional
   // separation so they don't sink into each other; a hard enough clack rings
-  // both tubes, scaled by how fast they met.
-  const RESTITUTION = 0.8;
+  // both tubes, scaled by how fast they met. Bamboo-on-bamboo is a dead thud,
+  // not a billiard ball: low restitution, so one hard hit passes a couple of
+  // clacks down the row and dies out instead of setting the whole grove off.
+  const RESTITUTION = 0.45;
   const lastClack = new Map<number, number>();
 
   function collide(nowMs: number): void {
@@ -268,9 +273,9 @@ function setupChimes(): void {
         b.vel = ((1 + RESTITUTION) * uA + (1 - RESTITUTION) * uB) / 2 / h;
 
         const last = lastClack.get(i) ?? 0;
-        if (closing > 90 && nowMs - last > 80) {
+        if (closing > 140 && nowMs - last > 80) {
           lastClack.set(i, nowMs);
-          const punch = 0.25 + Math.min(1, closing / 1500) * 0.6;
+          const punch = 0.2 + Math.min(1, closing / 1800) * 0.5;
           strike(a.note, a.pan, punch);
           strike(b.note, b.pan, punch);
         }
@@ -284,23 +289,33 @@ function setupChimes(): void {
   const lastStruck = new Map<Tube, number>();
 
   function hitTube(t: Tube, x: number, y: number, vx: number): void {
+    // The sound and the tap-nudge are debounced; the carry below is not, so a
+    // strike landing inside the debounce window (a press followed instantly
+    // by the swipe's first move) still steers the tube the way the swipe went,
+    // while a pointer jittering inside a tube can't pump it with nudges.
     const nowMs = performance.now();
-    if (nowMs - (lastStruck.get(t) ?? 0) < 60) return;
-    lastStruck.set(t, nowMs);
-
-    strike(t.note, t.pan, 0.45 + Math.abs(vx) / 2600);
-
-    // The pointer's horizontal velocity becomes angular velocity at the
-    // contact height, so the tube swings the way it was hit, harder for a
-    // faster strum. A near-still tap just pushes the tube away from the side
-    // it was touched on.
-    const arm = clamp(y - t.pivotY, 60, t.length);
-    let impulse = vx / arm;
-    if (Math.abs(impulse) < 0.6) {
-      const side = x <= t.pivotX + Math.sin(t.angle) * arm ? 1 : -1;
-      impulse = side * (0.8 + Math.random() * 0.5);
+    const struck = nowMs - (lastStruck.get(t) ?? 0) >= 100;
+    if (struck) {
+      lastStruck.set(t, nowMs);
+      strike(t.note, t.pan, 0.45 + Math.min(0.55, Math.abs(vx) / 3000));
     }
-    t.vel = clamp(t.vel + impulse, -4.5, 4.5);
+
+    // The striker carries the tube with it: contact SETS the tube's angular
+    // velocity to follow the pointer at the contact height, rather than
+    // adding an impulse. The tube always leaves in the direction of the
+    // swipe, a drag can't pump it to absurd speed, and a slower
+    // same-direction touch never brakes a tube already flying. A near-still
+    // tap just nudges the tube away from the side it was touched on.
+    const arm = clamp(y - t.pivotY, 60, t.length);
+    const target = clamp((vx / arm) * 0.6, -2.8, 2.8);
+    if (Math.abs(target) >= 0.5) {
+      if ((target > 0 && target > t.vel) || (target < 0 && target < t.vel)) {
+        t.vel = target;
+      }
+    } else if (struck) {
+      const side = x <= t.pivotX + Math.sin(t.angle) * arm ? 1 : -1;
+      t.vel = clamp(t.vel + side * (0.7 + Math.random() * 0.4), -2.8, 2.8);
+    }
     wake();
   }
 
@@ -315,20 +330,18 @@ function setupChimes(): void {
 
   // A fast strum moves many pixels between pointermove events, so testing only
   // the event's own position skips whole tubes. Sweep the segment from the
-  // previous position instead: any tube whose centreline the segment crosses
-  // (or whose body the endpoint lands in) gets struck.
+  // previous position instead: any tube whose horizontal strip the segment
+  // touches gets struck — overlap with the whole strip, not just a centreline
+  // crossing, or a swipe that starts inside a tube's off-centre half and
+  // leaves outward would never register on that tube.
   function sweep(x0: number, y0: number, x1: number, y1: number, vx: number): void {
+    const lo = Math.min(x0, x1);
+    const hi = Math.max(x0, x1);
     for (const t of tubes) {
       const cx = t.pivotX + Math.sin(t.angle) * t.length * 0.75;
-      const f0 = x0 - cx;
-      const f1 = x1 - cx;
-      let hitY = -1;
-      if (f0 < 0 !== f1 < 0) {
-        const s = f0 / (f0 - f1);
-        hitY = y0 + (y1 - y0) * s;
-      } else if (Math.abs(f1) <= t.halfWidth) {
-        hitY = y1;
-      }
+      if (hi < cx - t.halfWidth || lo > cx + t.halfWidth) continue;
+      const s = x1 === x0 ? 0.5 : clamp((cx - x0) / (x1 - x0), 0, 1);
+      const hitY = y0 + (y1 - y0) * s;
       if (hitY >= t.pivotY && hitY <= t.pivotY + t.length) {
         hitTube(t, x0, hitY, vx);
       }
